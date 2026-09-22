@@ -986,27 +986,6 @@ mod tests {
             )
             .unwrap();
             assert_eq!(unbounded["2026-03-15"].input_tokens, 1_099);
-
-            // Local patch: with earlier files kept, the bounded day equals the
-            // unbounded day instead of trusting the historical file's mtime.
-            let _guard = ccusage_test_support::EnvVarsGuard::set_many([(
-                crate::paths::CODEX_KEEP_EARLIER_FILES_ENV,
-                Some(std::ffi::OsString::from("1")),
-            )]);
-            let kept = load_groups_from_directory(
-                &fixture.path("sessions"),
-                &SharedArgs {
-                    single_thread,
-                    ..shared.clone()
-                },
-                AgentReportKind::Daily,
-            )
-            .unwrap();
-            assert_eq!(kept["2026-03-15"].input_tokens, 1_099);
-            assert_eq!(
-                kept["2026-03-15"].total_tokens,
-                unbounded["2026-03-15"].total_tokens
-            );
         }
     }
 

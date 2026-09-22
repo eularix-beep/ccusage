@@ -112,7 +112,16 @@ pub(super) fn filter_codex_usage_files(
     files: &[PathBuf],
     shared: &SharedArgs,
 ) -> Vec<PathBuf> {
-    let Some(eligibility) = CodexFileEligibility::from_shared(shared) else {
+    filter_codex_usage_files_with(sessions_dir, files, shared, keep_earlier_files())
+}
+
+fn filter_codex_usage_files_with(
+    sessions_dir: &Path,
+    files: &[PathBuf],
+    shared: &SharedArgs,
+    keep_earlier: bool,
+) -> Vec<PathBuf> {
+    let Some(eligibility) = CodexFileEligibility::from_shared(shared, keep_earlier) else {
         return files.to_vec();
     };
     files
@@ -132,7 +141,7 @@ pub(super) fn filter_codex_usage_files(
 // can still hold records inside the range, and its mtime was observed to lag
 // those records, so the pruning can silently drop usage. Records are still
 // filtered by their own timestamps afterwards; only the upper bound prunes.
-pub(super) const CODEX_KEEP_EARLIER_FILES_ENV: &str = "CCUSAGE_CODEX_KEEP_EARLIER_FILES";
+const CODEX_KEEP_EARLIER_FILES_ENV: &str = "CCUSAGE_CODEX_KEEP_EARLIER_FILES";
 
 fn keep_earlier_files() -> bool {
     env::var_os(CODEX_KEEP_EARLIER_FILES_ENV).is_some_and(|value| value == "1")
@@ -146,7 +155,7 @@ struct CodexFileEligibility {
 }
 
 impl CodexFileEligibility {
-    fn from_shared(shared: &SharedArgs) -> Option<Self> {
+    fn from_shared(shared: &SharedArgs, keep_earlier: bool) -> Option<Self> {
         let timezone =
             parse_tz(shared.timezone.as_deref()).or_else(|| Some(JiffTimeZone::system()));
         let since_date = shared.since.as_deref().and_then(parse_compact_date);
@@ -160,7 +169,7 @@ impl CodexFileEligibility {
             return None;
         }
         Some(Self {
-            since_date: since_date.filter(|_| !keep_earlier_files()),
+            since_date: since_date.filter(|_| !keep_earlier),
             until_path_date: until_millis.and_then(utc_path_date),
             since_millis,
         })
@@ -443,20 +452,10 @@ mod tests {
         };
         let files = [historical.clone(), current.clone(), after];
 
-        let pruned = {
-            let _guard = ccusage_test_support::EnvVarsGuard::set_many([(
-                CODEX_KEEP_EARLIER_FILES_ENV,
-                None,
-            )]);
-            filter_codex_usage_files(&sessions_dir, &files, &shared)
-        };
-        let kept = {
-            let _guard = ccusage_test_support::EnvVarsGuard::set_many([(
-                CODEX_KEEP_EARLIER_FILES_ENV,
-                Some(std::ffi::OsString::from("1")),
-            )]);
-            filter_codex_usage_files(&sessions_dir, &files, &shared)
-        };
+        // The switch is passed directly: setting the variable here would leak
+        // into tests running concurrently in this process.
+        let pruned = filter_codex_usage_files_with(&sessions_dir, &files, &shared, false);
+        let kept = filter_codex_usage_files_with(&sessions_dir, &files, &shared, true);
 
         assert_eq!(pruned, vec![current.clone()]);
         assert_eq!(kept, vec![historical, current]);
