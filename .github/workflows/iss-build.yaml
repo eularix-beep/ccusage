@@ -2,7 +2,7 @@
 name: iss-build
 on:
   push:
-    branches: [iss-local-accounting]
+    branches: [iss-upstream-baseline]
     tags: ['iss-v*']
 permissions:
   contents: write
@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       - name: Test patched adapters
         shell: bash
-        run: cargo test --manifest-path rust/Cargo.toml --locked -p ccusage-adapter-antigravity -p ccusage-adapter-codex
+        run: cargo test --manifest-path rust/Cargo.toml --locked -p ccusage-adapter-antigravity -p ccusage-adapter-codex --no-fail-fast
       - name: Build release binary
         shell: bash
         run: cargo build --manifest-path rust/Cargo.toml --locked --release --bin ccusage
