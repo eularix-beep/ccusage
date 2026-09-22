@@ -114,7 +114,7 @@ fn write_entry(path: &Path, entry: &CacheEntry) -> io::Result<()> {
 pub(super) fn parse_database(
     database: &Path,
     shared: &SharedArgs,
-) -> Result<Option<Vec<AntigravityUsageEvent>>> {
+) -> Result<Vec<AntigravityUsageEvent>> {
     let Some(cache_dir) = env::var_os(ANTIGRAVITY_CACHE_DIR_ENV).map(PathBuf::from) else {
         return parse_sqlite_file(database);
     };
@@ -127,18 +127,18 @@ pub(super) fn parse_database(
     if let Some(before) = &before
         && let Some(events) = read_entry(&entry_file, &canonical, before)
     {
-        return Ok(Some(events));
+        return Ok(events);
     }
 
     let parsed = parse_sqlite_file(database)?;
-    if let (Some(events), Some(before)) = (&parsed, before)
+    if let Some(before) = before
         && fingerprint(database).as_ref() == Some(&before)
     {
         let entry = CacheEntry {
             schema: CACHE_SCHEMA.to_string(),
             path: canonical,
             fingerprint: before,
-            events: events.clone(),
+            events: parsed.clone(),
         };
         if let Err(error) = fs::create_dir_all(&cache_dir).and_then(|()| write_entry(&entry_file, &entry)) {
             debug_log(shared, format!("Antigravity parse cache write skipped: {error}"));
@@ -167,7 +167,7 @@ mod tests {
         }
     }
 
-    fn database(path: &Path, response_id: &str, input_tokens: u64, seconds: i64) {
+    fn database(path: &Path, response_id: &'static str, input_tokens: u64, seconds: u64) {
         create_database(
             path,
             &[(

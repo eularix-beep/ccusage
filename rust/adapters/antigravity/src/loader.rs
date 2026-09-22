@@ -22,7 +22,7 @@ fn load_entries_inner(shared: &SharedArgs, pricing: &PricingMap) -> Result<Vec<L
     let database_paths = conversation_db_paths()?;
     let mut parsed_events = Vec::new();
     for database_path in database_paths {
-        parsed_events.extend(parse_sqlite_file(&database_path)?);
+        parsed_events.extend(parse_database(&database_path, shared)?);
     }
     let mut events = deduplicate_events(parsed_events);
     events.sort_by_key(|event| event.timestamp);
