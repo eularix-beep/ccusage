@@ -14,8 +14,9 @@ const API_PROVIDER_GOOGLE_VERTEX: u64 = 3;
 const API_PROVIDER_GOOGLE_GEMINI: u64 = 24;
 const API_PROVIDER_GOOGLE_EVERGREEN: u64 = 30;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(super) struct AntigravityUsageEvent {
+    #[serde(with = "timestamp_millis")]
     pub(super) timestamp: TimestampMs,
     timestamp_text: String,
     session_id: String,
@@ -32,6 +33,21 @@ pub(super) struct AntigravityUsageEvent {
     pub(super) identities: Vec<String>,
     timestamp_rank: u8,
     message_id_rank: u8,
+}
+
+// Local patch: lets the opt-in parse cache store events losslessly.
+mod timestamp_millis {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    use crate::TimestampMs;
+
+    pub(super) fn serialize<S: Serializer>(value: &TimestampMs, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_i64(value.as_millis())
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TimestampMs, D::Error> {
+        i64::deserialize(deserializer).map(TimestampMs::from_millis)
+    }
 }
 
 #[derive(Debug, Default)]

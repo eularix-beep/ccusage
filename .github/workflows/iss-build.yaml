@@ -1,0 +1,45 @@
+# Fork-only workflow: tests and builds the locally patched Windows binary.
+name: iss-build
+on:
+  push:
+    branches: [iss-local-accounting]
+    tags: ['iss-v*']
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test patched adapters
+        shell: bash
+        run: cargo test --manifest-path rust/Cargo.toml --locked -p ccusage-adapter-antigravity -p ccusage-adapter-codex
+      - name: Build release binary
+        shell: bash
+        run: cargo build --manifest-path rust/Cargo.toml --locked --release --bin ccusage
+      - name: Stage and hash
+        shell: bash
+        run: |
+          mkdir dist
+          cp rust/target/release/ccusage.exe dist/ccusage.exe
+          (cd dist && sha256sum ccusage.exe > ccusage.exe.sha256 && cat ccusage.exe.sha256)
+          rustc --version
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/ccusage.exe
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ccusage-win32-x64
+          path: dist/
+          if-no-files-found: error
+      - name: Publish release for tag
+        if: startsWith(github.ref, 'refs/tags/iss-v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/ccusage.exe dist/ccusage.exe.sha256 --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes "Locally patched ccusage v20.0.24 build (commit $GITHUB_SHA). Not an upstream release."

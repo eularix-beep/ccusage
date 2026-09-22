@@ -127,6 +127,17 @@ pub(super) fn filter_codex_usage_files(
         .collect()
 }
 
+// Local patch: when this variable is set to `1`, the lower bound no longer
+// prunes files by modification time. A file whose path date is before --since
+// can still hold records inside the range, and its mtime was observed to lag
+// those records, so the pruning can silently drop usage. Records are still
+// filtered by their own timestamps afterwards; only the upper bound prunes.
+pub(super) const CODEX_KEEP_EARLIER_FILES_ENV: &str = "CCUSAGE_CODEX_KEEP_EARLIER_FILES";
+
+fn keep_earlier_files() -> bool {
+    env::var_os(CODEX_KEEP_EARLIER_FILES_ENV).is_some_and(|value| value == "1")
+}
+
 #[derive(Clone, Copy)]
 struct CodexFileEligibility {
     since_date: Option<Date>,
@@ -149,7 +160,7 @@ impl CodexFileEligibility {
             return None;
         }
         Some(Self {
-            since_date,
+            since_date: since_date.filter(|_| !keep_earlier_files()),
             until_path_date: until_millis.and_then(utc_path_date),
             since_millis,
         })
@@ -411,6 +422,44 @@ mod tests {
         );
 
         assert_eq!(filtered, vec![resumed, current]);
+    }
+
+    #[test]
+    fn keep_earlier_files_disables_only_lower_bound_mtime_pruning() {
+        let fixture = Fixture::new();
+        let sessions_dir = fixture.create_dir_all("codex/sessions");
+        let historical = fixture.write_file("codex/sessions/2025/01/01/historical.jsonl", "");
+        let current = fixture.write_file("codex/sessions/2026/03/15/current.jsonl", "");
+        let after = fixture.write_file("codex/sessions/2026/03/17/after.jsonl", "");
+        set_file_modified(
+            &historical,
+            crate::parse_ts_timestamp("2025-01-01T00:00:00.000Z").unwrap(),
+        );
+        let shared = SharedArgs {
+            since: Some("20260315".to_string()),
+            until: Some("20260315".to_string()),
+            timezone: Some("Asia/Seoul".to_string()),
+            ..SharedArgs::default()
+        };
+        let files = [historical.clone(), current.clone(), after];
+
+        let pruned = {
+            let _guard = ccusage_test_support::EnvVarsGuard::set_many([(
+                CODEX_KEEP_EARLIER_FILES_ENV,
+                None,
+            )]);
+            filter_codex_usage_files(&sessions_dir, &files, &shared)
+        };
+        let kept = {
+            let _guard = ccusage_test_support::EnvVarsGuard::set_many([(
+                CODEX_KEEP_EARLIER_FILES_ENV,
+                Some(std::ffi::OsString::from("1")),
+            )]);
+            filter_codex_usage_files(&sessions_dir, &files, &shared)
+        };
+
+        assert_eq!(pruned, vec![current.clone()]);
+        assert_eq!(kept, vec![historical, current]);
     }
 
     #[test]

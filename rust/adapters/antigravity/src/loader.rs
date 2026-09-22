@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use crate::{LoadedEntry, PricingMap, Result, cli::SharedArgs, parse_tz};
 
 use super::{
-    parser::{AntigravityUsageEvent, event_to_loaded, merge_usage_event, parse_sqlite_file},
+    cache::parse_database,
+    parser::{AntigravityUsageEvent, event_to_loaded, merge_usage_event},
     paths::conversation_db_paths,
 };
 
