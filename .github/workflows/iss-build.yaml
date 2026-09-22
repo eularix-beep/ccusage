@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       - name: Test patched adapters
         shell: bash
-        run: cargo test --manifest-path rust/Cargo.toml --locked -p ccusage-adapter-codex --no-fail-fast
+        run: cargo test --manifest-path rust/Cargo.toml --locked -p ccusage-adapter-codex --features ccusage-core/fetch-litellm-pricing --no-fail-fast
       - name: Build release binary
         shell: bash
         # Same command as upstream's Windows release build. The downloaded
