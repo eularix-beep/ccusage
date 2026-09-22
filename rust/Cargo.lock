@@ -205,7 +205,6 @@ dependencies = [
  "ccusage-test-support",
  "insta",
  "jiff",
- "serde",
  "serde_json",
  "sqlite",
 ]

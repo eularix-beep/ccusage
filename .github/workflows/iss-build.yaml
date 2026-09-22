@@ -16,12 +16,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The one skipped test fails identically on unpatched v20.0.24 on Windows
-      # (branch iss-upstream-baseline): its path assertion does not match the
-      # Windows error text. It is unrelated to the patch.
       - name: Test patched adapters
         shell: bash
-        run: cargo test --manifest-path rust/Cargo.toml --locked -p ccusage-adapter-antigravity -p ccusage-adapter-codex --no-fail-fast -- --skip loader::tests::propagates_database_open_and_query_errors
+        run: cargo test --manifest-path rust/Cargo.toml --locked -p ccusage-adapter-codex --no-fail-fast
       - name: Build release binary
         shell: bash
         # Same command as upstream's Windows release build. The downloaded
